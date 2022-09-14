@@ -75,10 +75,14 @@ is opened.
    section 7,2
  7. Which `socket` option "Returns a value indicating whether or not this
     socket has been marked to accept connections with `listen(2)`"?
+<<<<<<< HEAD
     SO_ACCEPTCONN
  8. How many man pages (in any section) contain keyword references to
     `getaddrinfo`?
     3 pages
+=======
+ 8. How many short manual page descriptions contain the keyword `getaddrinfo`?
+>>>>>>> upstream/master
  9. According to the "DESCRIPTION" section of the man page for `string`, the
     functions described in that man page are used to perform operations on
     strings that are ________________. (fill in the blank)
