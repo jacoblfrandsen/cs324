@@ -1,1 +1,111 @@
-1. 
+1. It takes in a program and then after the sleep it uses the execve comand and switches over to the new enviroment.
+2. The printf will get there if there is a program that is given as a parameter to exec and once that program ends.
+If that program doesnt end it wont reach the printf
+3. ./exec /bin/cat 
+    Program "./exec" has pid 3704978. Sleeping.
+4. ps before during sleep:
+command:
+    ps -o user,pid,ppid,state,ucmd -p 3709847
+output:
+    USER         PID    PPID S CMD
+    jfran33  3709847 3702800 S exec
+
+    ps after sleep:
+command:
+    ps -o user,pid,ppid,state,ucmd -p 3709847
+output:
+     USER         PID    PPID S CMD
+    jfran33  3709847 3702800 S cat
+5. THe user is the same along with the PID and PPID. CMD is different because it is first using the exec CMD but
+when the cat command is passed in everything is switched over to that command that is what execve does in line 17. 
+This is why the user pid ppid and S are the same.
+6.
+./exec /yay 
+Program "./exec" has pid 3711465. Sleeping.
+Running exec of "/yay"
+End of program "./exec".
+7.
+  This takes in the pid using getpid then checks to see if there is an error with it if not then it forks the parent.
+  Creating a child and running the sections dependent by their own processes.
+8.
+  Section A is run by both. B is run by the child, and C is run by the parent. D is run by neither.
+9.
+ps -o user,pid,ppid,state,ucmd -p 3714613,3714614  --forest
+before sleep:
+jfran33  3714613 3702800 S fork
+jfran33  3714614 3714613 S  \_ fork
+
+After sleep:
+│USER         PID    PPID S CMD
+jfran33  3714613 3702800 S fork
+jfran33  3714614 3714613 Z  \_ fork <defunct>
+10.
+
+11.
+I put a wait(null) in the parent process that way it can reap the child process. I put it inbetween the two sleeps
+(line 37) that way it can reap at the right moment.
+12. 
+ps -o user,pid,ppid,state,ucmd -p 3871849,3871850  --forest
+USER         PID    PPID S CMD
+jfran33  3871849 3863563 S fork
+jfran33  3871850 3871849 S  \_ fork 
+
+After sleep:
+ps -o user,pid,ppid,state,ucmd -p 3871849,3871850  --forest
+USER         PID    PPID S CMD
+jfran33  3871849 3863563 S fork
+13.
+By adding the wait in the parent it reaps the child before sleep is called. Meaning only the parent process exists after the sleep.
+14.
+ps -o user,pid,ppid,state,ucmd -p 3820408,3820409  --forest
+USER         PID    PPID S CMD
+jfran33  3820408 3812444 S fork
+jfran33  3820409 3820408 S  \_ fork
+
+After C done sleeping:
+ps -o user,pid,ppid,state,ucmd -p 3820408,3820409  --forest
+│USER         PID    PPID S CMD
+jfran33  3820409       1 S fork
+15. 
+  THe difference is that after C was done sleeping the bash doesnt know that the child exsists because wait was never called. 
+  After C is done it everntually prints out B is done sleeping because even though bash wasnt keeping track of it the child still
+  exsisted and finished.
+16. Modified the file
+17.
+BEFORE FORK
+SECTION A
+SECTION A
+SECTION C
+SECTION B
+18.
+Starting program; process has pid 3851354
+Section A;  pid 3851354
+Section A;  pid 3851356
+Section C
+Section B
+hello from Section B
+19.
+Starting program; process has pid 3854115
+Section A;  pid 3854115
+Section C
+Section A;  pid 3854117
+Section B
+Program "./fork" has pid 3854117. Sleeping.
+Running exec of "/bin/cat"
+jfran33@michigan:~/cs324/cs324_byu/hw-fork-exec$ foobar
+20.
+Starting program; process has pid 2558597
+Section A;  pid 2558597
+Section A;  pid 2558598
+Section C
+Section B
+Program "./fork" has pid 2558598. Sleeping.
+Running exec of "/bin/cat"
+
+
+BEFORE FORK
+SECTION A
+SECTION A
+SECTION C
+SECTION B
+foobar
