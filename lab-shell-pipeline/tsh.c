@@ -106,6 +106,37 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
+     
+    printf("You entered: %s\n", cmdline);
+    char *argv[MAXARGS] = {};
+    int cmd[MAXARGS] = {};
+    int stdin_redir[MAXARGS] = {};
+    int stdout_redir[MAXARGS] = {};
+    parseline(cmdline, argv);
+    int comand = parseargs(argv, cmd, stdin_redir, stdout_redir);
+    builtin_cmd(argv);
+
+
+    int pid = fork();
+    if (pid == 0){
+        //code
+        
+        // exit just the child and if we fail
+        exit(0);
+    }
+    else{
+        //parent
+    }
+    waitpid
+    int i = 0;
+    while(argv[i]) {
+        // code
+        i++;
+        
+    }
+
+     
+
     return;
 }
 
@@ -232,7 +263,19 @@ int parseline(const char *cmdline, char **argv)
  *    it immediately.  
  */
 int builtin_cmd(char **argv) 
-{
+{   
+    // char *x[] = {"ab", "bc", "cd", 0};
+
+    char *s = "quit";
+    int i = 0;
+    
+    while(argv[i]) {
+        if(strcmp(argv[i], s) == 0) {
+            exit(0);
+        }
+        i++;
+        
+    }
     return 0;     /* not a builtin command */
 }
 
