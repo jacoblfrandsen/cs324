@@ -107,35 +107,102 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
      
-    printf("You entered: %s\n", cmdline);
-    char *argv[MAXARGS] = {};
-    int cmd[MAXARGS] = {};
-    int stdin_redir[MAXARGS] = {};
-    int stdout_redir[MAXARGS] = {};
-    parseline(cmdline, argv);
-    int comand = parseargs(argv, cmd, stdin_redir, stdout_redir);
-    builtin_cmd(argv);
+    char *argv[MAXARGS];      /* argv for execve() */
+    int cmd[MAXARGS];         /* array whose indexes are the indexes of each command in argv[] */
+    int stdin_redir[MAXARGS]; /* array signifies if cmd[] index contains stdin/stdout redirections */
+    int stdout_redir[MAXARGS];
+    pid_t pid;
+    pid_t pgid;                                                          /* Process ID */
+    int childPID[MAXARGS];                                               /* Number of child processes and their IDs */
+    int readEnd = -1;                                                    // Read End
+    parseline(cmdline, argv);                                   // Parse our shell command line
+    //parseargs returns the number of commands we have
+    int numOfCommands = parseargs(argv, cmd, stdin_redir, stdout_redir); // Parse arguments
 
+    // Loop through every command that is in args
+    // size_t is an unsigned long int
+    for(size_t i = 0; i < numOfCommands; i++){
+        //check if its quit
+        if(!builtin_cmd(argv)){
+            //open pipe in parent
+            //init the pipe array
+            int p[2];
+            //make sure we dont have to many pipes
+            if(i != numOfCommands -1){
+                //create pipe
+                if(pipe(p)< 0){
+                    exit(1);
+                }
+            }
+            //fork the child
+            if((pid = fork()) == 0){
+                //in child
+                //handel the redirects
+                if(stdin_redir[i] > 0){
+                    char *filename = argv[stdin_redir[i]];
+                    //read from the file(r)
+                    FILE *file = fopen(filename, "r");
+                    int fd = fileno(file);
+                    dup2(fd, 0);
+                    close(fd);
+                }
+                if (stdout_redir[i] >0){
+                    char *filename = argv[stdout_redir[i]];
+                    //write to the file (w)
+                    FILE *file = fopen(filename, "w");
+                    int fd = fileno(file);
+                    dup2(fd, 1);
+                    close(fd);
+                }
+                if (numOfCommands > 1){
+                    if (i == 0){
+                        close(p[0]);
+                        dup2(p[1], 1);
+                        close(p[1]);   
+                    }
+                    else if (i == numOfCommands - 1)
+                    {
+                        //at the end of the commands
+                        dup2(readEnd, 0);
+                        close(readEnd);
+                    }
+                    else
+                    {
+                        close(p[0]);
+                        dup2(p[1], 1);    
+                        dup2(readEnd, 0); 
+                        close(p[1]);      
+                        close(readEnd);
+                    }
+                }
 
-    int pid = fork();
-    if (pid == 0){
-        //code
-        
-        // exit just the child and if we fail
-        exit(0);
-    }
-    else{
-        //parent
-    }
-    waitpid
-    int i = 0;
-    while(argv[i]) {
-        // code
-        i++;
-        
-    }
+                // Run the executable in the context of the child process
+                // Run and check if it is actually a command
+                if (execve(argv[cmd[i]], &argv[cmd[i]], environ) < 0)
+                {
+                    printf("%s: Command not found\n", argv[0]);
+                    exit(0);
+                }
 
-     
+            }
+            //in parent Process
+            else{
+                if (i == 0)
+                    pgid = pid;
+
+                setpgid(pid, pgid);
+
+                childPID[i] = pid;
+
+                readEnd = p[0];
+
+                if (numOfCommands > 1)
+                    close(p[1]);
+            }
+        }
+    }
+    for (int i = 0; i < numOfCommands; i++)
+    waitpid((childPID[i]), NULL, 0);
 
     return;
 }
@@ -264,19 +331,13 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv) 
 {   
-    // char *x[] = {"ab", "bc", "cd", 0};
+    // only checks the first command if its quit
+    if (!strcmp(argv[0], "quit")) /* quit command */
+        exit(0);
 
-    char *s = "quit";
-    int i = 0;
-    
-    while(argv[i]) {
-        if(strcmp(argv[i], s) == 0) {
-            exit(0);
-        }
-        i++;
-        
-    }
-    return 0;     /* not a builtin command */
+    return 0; /* not a builtin command */
+
+
 }
 
 /***********************
