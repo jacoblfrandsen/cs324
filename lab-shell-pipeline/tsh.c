@@ -155,6 +155,7 @@ void eval(char *cmdline)
                     close(fd);
                 }
                 if (numOfCommands > 1){
+                    // for the first command
                     if (i == 0){
                         close(p[0]);
                         dup2(p[1], 1);
@@ -163,11 +164,13 @@ void eval(char *cmdline)
                     else if (i == numOfCommands - 1)
                     {
                         //at the end of the commands
+                        //readend = -1 first time around
                         dup2(readEnd, 0);
                         close(readEnd);
                     }
                     else
                     {
+                        // for everyother command
                         close(p[0]);
                         dup2(p[1], 1);    
                         dup2(readEnd, 0); 
