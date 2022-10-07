@@ -120,7 +120,7 @@ int main(int argc, char **argv)
     /* Install the signal handlers */
 
     /* These are the ones you will need to implement */
-    Signal(SIGINT,  sigint_handler);   /* ctrl-c */
+    // Signal(SIGINT,  sigint_handler);   /* ctrl-c */
     Signal(SIGTSTP, sigtstp_handler);  /* ctrl-z */
     Signal(SIGCHLD, sigchld_handler);  /* Terminated or stopped child */
 
@@ -167,6 +167,13 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
+    char *argv[MAXARGS];      
+    // int cmd[MAXARGS];
+    //check for built in commands first
+    int BForFG = parseline(cmdline, argv); 
+    printf("parseline %d", BForFG);
+    builtin_cmd(argv);
+    // if parseLine returns true then go to bg else go to fg
     return;
 }
 
@@ -294,7 +301,12 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv) 
 {
-    return 0;     /* not a builtin command */
+    // only checks the first command if its quit
+    if (!strcmp(argv[0], "quit")) /* quit command */
+        exit(0);
+
+    return 1; /* not a builtin command */
+
 }
 
 /* 
