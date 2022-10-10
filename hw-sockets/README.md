@@ -479,7 +479,10 @@ the socket connection is established:
    sent, which might be less than the number you requested to be sent (see the
    `write()` man page for more!), so you need to keep track of the total bytes
    sent to ensure that all has been sent and write your loop termination test
-   accordingly.
+   accordingly. 
+
+   NOTES:
+    use the read() when reading the stdin (the var nread); in the read buffer + offset
 
 In the top-left "remote" pane, start a netcat (`nc` command) server listening
 for incoming TCP connections on a port of your choosing:

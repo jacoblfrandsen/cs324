@@ -45,7 +45,7 @@ char sbuf[MAXLINE];         /* for composing sprintf messages */
 struct job_t {              /* The job struct */
     pid_t pid;              /* job PID */
     pid_t pgid;             /* job pgid */
-    int jidMain;                /* job ID [1, 2, ...] */
+    int jidS;                /* job ID [1, 2, ...] */
     int state;              /* UNDEF, BG, FG, or ST */
     char cmdline[MAXLINE];  /* command line */
 };
@@ -77,7 +77,7 @@ int addjob(struct job_t *jobs, pid_t pid, pid_t pgid, int state, char *cmdline);
 int deletejob(struct job_t *jobs, pid_t pid); 
 pid_t fgpid(struct job_t *jobs);
 struct job_t *getjobpid(struct job_t *jobs, pid_t pid);
-struct job_t *getjobjid(struct job_t *jobs, int jidMain); 
+struct job_t *getjobjid(struct job_t *jobs, int jidS); 
 int pid2jid(pid_t pid); 
 void listjobs(struct job_t *jobs);
 
@@ -169,7 +169,7 @@ void eval(char *cmdline)
 {
     char* argv[MAXARGS];
     memset(argv, 0, sizeof(argv));
-    int tobg = parseline(cmdline,argv);
+    int bg = parseline(cmdline,argv);
 
     int bic = builtin_cmd(argv);
     
@@ -178,7 +178,7 @@ void eval(char *cmdline)
     // }
 
     int pid;
-    sigset_t mask, maskP;
+    sigset_t mask, mask_prev;
 
     sigemptyset(&mask);
 
@@ -186,10 +186,10 @@ void eval(char *cmdline)
     sigaddset(&mask, SIGINT);
     sigaddset(&mask, SIGTSTP);
 
-    sigprocmask(SIG_BLOCK, &mask, &maskP); /* Block Signals */
+    sigprocmask(SIG_BLOCK, &mask, &mask_prev); /* Block Signals */
 
     if ((pid = fork()) == 0) { /* Child process */
-        sigprocmask(SIG_SETMASK, &maskP, NULL); /* Unblock Signals */
+        sigprocmask(SIG_SETMASK, &mask_prev, NULL); /* Unblock Signals */
 
         if (bic == 0 && execve(argv[0], argv, NULL) < 0) {
             printf("%s: Command not found\n", argv[0]);
@@ -203,13 +203,13 @@ void eval(char *cmdline)
         fflush(stdout);
     }
 
-    addjob(jobs, pid, pid, tobg+1, cmdline);  /* Add the child to the job list */
+    addjob(jobs, pid, pid, bg+1, cmdline);  /* Add the child to the job list */
     
-    sigprocmask(SIG_SETMASK, &maskP, NULL); /* Unblock Signals */
+    sigprocmask(SIG_SETMASK, &mask_prev, NULL); /* Unblock Signals */
     
     waitfg(pid);
 
-    if (tobg) {
+    if (bg) {
         printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline);
         fflush(stdout);
     }
@@ -341,33 +341,29 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv) 
 {
-    char **a = argv;
-    // checks to see if the first command is any build in command
-    if(strcmp(a[0],"quit") == 0)
+    if(strcmp(argv[0],"quit") == 0)
         exit(0);
-    else if (strcmp(a[0],"fg") == 0){
-        do_bgfg(a);
+    else if (strcmp(argv[0],"fg") == 0){
+        do_bgfg(argv);
         return 1;
     }
-    else if (strcmp(a[0],"bg") == 0){
-        do_bgfg(a);
+    else if (strcmp(argv[0],"bg") == 0){
+        do_bgfg(argv);
         return 2;
     }
-    else if (strcmp(a[0],"jobs") == 0) {
+    else if (strcmp(argv[0],"jobs") == 0) {
         listjobs(jobs);
         return 3;
     }
     
     return 0;     /* not a builtin command */
-
 }
 
 /* 
  * do_bgfg - Execute the builtin bg and fg commands
  */
 void do_bgfg(char **argv) 
-{
-    //check if has job label
+{   
     if (strcmp(argv[0],"fg") == 0) {
         if (argv[1] == NULL) {
             printf("fg command requires PID or %%jobid argument\n");
@@ -400,13 +396,13 @@ void do_bgfg(char **argv)
     char firstChar = argv[1][0];
     struct job_t* job;
     if (firstChar == 37) {
-        char jidMain[strlen(argv[1])-1];
+        char jidS[strlen(argv[1])-1];
         for (int i=0; i<strlen(argv[1]); i++) {
-            jidMain[i] = argv[1][i+1];
+            jidS[i] = argv[1][i+1];
         }
-        int jidTemp;
-        sscanf(jidMain, "%d", &jidTemp);
-        job = getjobjid(jobs, jidTemp);
+        int jid;
+        sscanf(jidS, "%d", &jid);
+        job = getjobjid(jobs, jid);
 
         if (job == NULL) {
             printf("%s: No such job\n", argv[1]);
@@ -432,7 +428,7 @@ void do_bgfg(char **argv)
     }
     else {
         job->state = BG;
-        printf("[%d] (%d) %s", job->jidMain, job->pid, job->cmdline);
+        printf("[%d] (%d) %s", job->jidS, job->pid, job->cmdline);
         fflush(stdout);  
         kill(-job->pgid, SIGCONT);
     }
@@ -445,7 +441,6 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
-    // wiat for any procces in the forground
     struct job_t *job = getjobpid(jobs, pid);
     while (job != NULL && job->state == FG) {
         sleep(1);
@@ -469,7 +464,6 @@ void sigchld_handler(int sig)
 {
     pid_t pid;
     int status;
-    //wait the children
     while ((pid = waitpid(-1, &status, WNOHANG|WUNTRACED)) > 0)
     {
         if (WIFSTOPPED(status)) {
@@ -478,7 +472,6 @@ void sigchld_handler(int sig)
             job->state = ST;
         }
         else if (WIFEXITED(status)) {
-            
             deletejob(jobs, pid);
         }
         else if (WIFSIGNALED(status)) {
@@ -487,7 +480,7 @@ void sigchld_handler(int sig)
         }
     }
     fflush(stdout);
-	    return;
+	return;
 }
 
 /* 
@@ -529,7 +522,7 @@ void sigtstp_handler(int sig)
 /* clearjob - Clear the entries in a job struct */
 void clearjob(struct job_t *job) {
     job->pid = 0;
-    job->jidMain = 0;
+    job->jidS = 0;
     job->state = UNDEF;
     job->cmdline[0] = '\0';
 }
@@ -548,8 +541,8 @@ int maxjid(struct job_t *jobs)
     int i, max=0;
 
     for (i = 0; i < MAXJOBS; i++)
-	if (jobs[i].jidMain > max)
-	    max = jobs[i].jidMain;
+	if (jobs[i].jidS > max)
+	    max = jobs[i].jidS;
     return max;
 }
 
@@ -566,12 +559,12 @@ int addjob(struct job_t *jobs, pid_t pid, pid_t pgid, int state, char *cmdline)
 	    jobs[i].pid = pid;
 	    jobs[i].pgid = pgid;
 	    jobs[i].state = state;
-	    jobs[i].jidMain = nextjid++;
+	    jobs[i].jidS = nextjid++;
 	    if (nextjid > MAXJOBS)
 		nextjid = 1;
 	    strcpy(jobs[i].cmdline, cmdline);
   	    if(verbose){
-	        printf("Added job [%d] %d %s\n", jobs[i].jidMain, jobs[i].pid, jobs[i].cmdline);
+	        printf("Added job [%d] %d %s\n", jobs[i].jidS, jobs[i].pid, jobs[i].cmdline);
             }
             return 1;
 	}
@@ -621,14 +614,14 @@ struct job_t *getjobpid(struct job_t *jobs, pid_t pid) {
 }
 
 /* getjobjid  - Find a job (by JID) on the job list */
-struct job_t *getjobjid(struct job_t *jobs, int jidMain) 
+struct job_t *getjobjid(struct job_t *jobs, int jidS) 
 {
     int i;
 
-    if (jidMain < 1)
+    if (jidS < 1)
 	return NULL;
     for (i = 0; i < MAXJOBS; i++)
-	if (jobs[i].jidMain == jidMain)
+	if (jobs[i].jidS == jidS)
 	    return &jobs[i];
     return NULL;
 }
@@ -642,7 +635,7 @@ int pid2jid(pid_t pid)
 	return 0;
     for (i = 0; i < MAXJOBS; i++)
 	if (jobs[i].pid == pid) {
-            return jobs[i].jidMain;
+            return jobs[i].jidS;
         }
     return 0;
 }
@@ -654,7 +647,7 @@ void listjobs(struct job_t *jobs)
     
     for (i = 0; i < MAXJOBS; i++) {
 	if (jobs[i].pid != 0) {
-	    printf("[%d] (%d) ", jobs[i].jidMain, jobs[i].pid);
+	    printf("[%d] (%d) ", jobs[i].jidS, jobs[i].pid);
 	    switch (jobs[i].state) {
 		case BG: 
 		    printf("Running ");
@@ -738,6 +731,3 @@ void sigquit_handler(int sig)
     printf("Terminating after receipt of SIGQUIT signal\n");
     exit(1);
 }
-
-
-
