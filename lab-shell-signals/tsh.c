@@ -171,11 +171,7 @@ void eval(char *cmdline)
     memset(argv, 0, sizeof(argv));
     int tobg = parseline(cmdline,argv);
 
-    int bic = builtin_cmd(argv);
-    
-    // if (builtin_cmd(argv) == 1) {
-    //     return;
-    // }
+    int builtCmd = builtin_cmd(argv);
 
     int pid;
     sigset_t mask, maskP;
@@ -191,7 +187,7 @@ void eval(char *cmdline)
     if ((pid = fork()) == 0) { /* Child process */
         sigprocmask(SIG_SETMASK, &maskP, NULL); /* Unblock Signals */
 
-        if (bic == 0 && execve(argv[0], argv, NULL) < 0) {
+        if (builtCmd == 0 && execve(argv[0], argv, NULL) < 0) {
             printf("%s: Command not found\n", argv[0]);
             fflush(stdout);
         }
